@@ -14,8 +14,7 @@ from langchain.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage
 from langchain.agents import AgentType
 from langchain.memory import ConversationBufferMemory
-from langchain.utilities import SerpAPIWrapper
-from langchain.agents import initialize_agent
+
 
 
 load_dotenv()
