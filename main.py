@@ -3,14 +3,17 @@ import os
 import motor.motor_asyncio
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
 
 from datetime import datetime
 
-import menus
-import db
 
-from openai_setup import setup, generate_response
+# import dbshki
+
+import menus
+from openai_setup import generate_response
 
 load_dotenv()
 
@@ -19,6 +22,7 @@ MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
 TG_TOKEN = os.getenv("TG_TOKEN")
 OPENAI_TOKEN = os.getenv("OPENAI_TOKEN")
 
+chat_history = ""
 # print(MONGO_USER, MONGO_PASSWORD)
 
 connection_string = (
@@ -37,33 +41,46 @@ collection = db["Users"]
 logging.basicConfig(level=logging.INFO)
 
 
-setup(OPENAI_TOKEN)
+# setup(OPENAI_TOKEN)
 
 # Initialize bot and dispatcher
 bot = Bot(token=TG_TOKEN)
-dp = Dispatcher(bot)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
 
-@dp.message_handler(commands=["start", "help"])
+class Twin(StatesGroup):
+    Age = State()
+    Info = State()
+    Chat = State()
+
+
+@dp.message_handler(commands=["start"])
 async def send_welcome(message: types.Message):
-    menu = InlineKeyboardMarkup(row_width=2)
-    menu.add(
-        InlineKeyboardButton(text="📝 Create Twin", callback_data="create_twin"),
-        InlineKeyboardButton(text="🖼 Open Collection", callback_data="open_collection"),
-    )
-    menu.add(InlineKeyboardButton(text="🔎 Help", callback_data="help"))
-
     msg = "Welcome to Flashback!"
-    await bot.send_message(message.chat.id, msg, reply_markup=menu)
+    await bot.send_message(message.chat.id, msg, reply_markup=menus.menu)
 
     user_id = message.chat.id
     await db.add_user(collection, user_id)
+    await Twin.Age.set()
+
+
+@dp.callback_query_handler(lambda query: query.data == "open_collection")
+async def handle_open_collection(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.from_user.id, "It is not available yet")
+
+
+# @dp.message_handler(state=Twin.Age)
+# await state.next() Twin.Info.set()
 
 
 @dp.message_handler()
-async def my_responses(message: types.Message):
+async def my_responses(message: types.Message, state):
+    global chat_history
     answer = generate_response(message)
-    await message.answer(answer)
+    chat_history += message
+    await message.answer(answer, chat_history)
 
 
 if __name__ == "__main__":

@@ -1,80 +1,56 @@
+import os
+from dotenv import load_dotenv
 import openai
-from langchain.llms import OpenAI
+from langchain import (
+    LLMMathChain,
+    OpenAI,
+    SerpAPIWrapper,
+    SQLDatabase,
+    SQLDatabaseChain,
+)
+from langchain.agents import initialize_agent, Tool
+from langchain.agents import AgentType
 from langchain.chat_models import ChatOpenAI
-from langchain.agents import Tool, initialize_agent, AgentType
-from langchain.memory import ConversationBufferMemory, ChatMessageHistory
-
-from main import OPENAI_TOKEN
-
-# from transformers import AutoTokenizer
-MODEL_NAME = "gpt-3.5-turbo"
-# tokenizer = AutoTokenizer.from_pretrained("openai-gpt")
+from langchain.schema import SystemMessage
+from langchain.agents import AgentType
+from langchain.memory import ConversationBufferMemory
+from langchain.utilities import SerpAPIWrapper
+from langchain.agents import initialize_agent
 
 
-def setup():
-    openai.api_key = OPENAI_TOKEN
+load_dotenv()
+
+MODEL_NAME = "gpt-3.5-turbo-0613"
+OPENAI_TOKEN = os.getenv("OPENAI_TOKEN")
+SERPAPI_TOKEN = os.getenv("SERPAPI_TOKEN")
+
+memory = ConversationBufferMemory(memory_key="chat_history")
+
+search = SerpAPIWrapper(serpapi_api_key=SERPAPI_TOKEN)
+tools = [
+    Tool(
+        name="Current Search",
+        func=search.run,
+        description="useful for when you need to answer questions about current events or the current state of the world",
+    ),
+]
+
+# agent_kwargs = [
+#     SystemMessage(
+#         "You are AI Assistant that helps a person to create his younger digital twin version. As a data you will require age that he wants to create, what was his life desire, main goal, what aspects of life you want to discuss. Don't annoy with question try to make it as fast as possible. "
+#     )
+# ]
+
+llm = OpenAI(temperature=0.5, openai_api_key=OPENAI_TOKEN)
+agent_chain = initialize_agent(
+    tools,
+    llm,
+    agent=AgentType.CONVERSATIONAL_REACT_DESCRIPTION,
+    verbose=True,
+    memory=memory,
+)
 
 
-class MyService:
-    def __init__(self):
-        self.openai_api_key = OPENAI_TOKEN
-        self.llm = OpenAI(
-            streaming=True,
-            temperature=0.7,
-            callbacks=[]  # Add your callback handlers if needed
-        )
-        self.memory = ConversationBufferMemory()
-        self.chat_model = ChatOpenAI(
-            streaming=True,
-            temperature=0.7,
-            callbacks=[]  # Add your callback handlers if needed
-        )
-        self.memory = ConversationBufferMemory(
-            memory_key="chat_history", return_messages=True
-        )
-        self.chat_history = ChatMessageHistory(variable_name="history")
-        self.tools = [
-            # Define your tools here
-            # Tool(name="tool_name", func=tool_function, description="Tool description"),
-        ]
-        self.main_prompt_text = "Your main prompt text goes here"
-        self.chat_template = "Your chat template goes here"
-
-        self.agent = initialize_agent(
-            self.tools,
-            self.llm,
-            agent=AgentType.YOUR_AGENT_TYPE,
-            verbose=True
-        )
-
-    def process_request(self, input_message):
-        # Process the user's input message
-        response = self.agent.run(self.main_prompt_text)
-        # Further process the response as needed
-        return response
-
-# Create an instance of your service
-service = MyService()
-
-# Process user input
-user_input = "User's input message"
-response = service.process_request(user_input)
-
-# Print the response
-print(response)
-
-
-# Function to generate response using OpenAI
 def generate_response(message):
-    prompt = f"{message}\nAI:"
-    response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=prompt,
-        temperature=0.9,
-        max_tokens=150,
-        top_p=1,
-        frequency_penalty=0.0,
-        presence_penalty=0.6,
-        stop=[" Human:", " AI:"],
-    )
-    return response.choices[0].text.strip()
+    prompt = f"{message}\n"
+    return agent_chain.run(input=prompt)
