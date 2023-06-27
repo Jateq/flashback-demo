@@ -8,9 +8,13 @@ Design your own digital twin from the past to chat with him! This project aims t
 
 ## Features 
 
+- Langchain for chat history
+
 that will be eventually added:
 
 - Intuitive tools to customize the appearance, personality, and background of your digital twin.
 - Time travel chat: Engage in conversations with your digital twin, reminiscing about the past and exploring shared memories.
 - Personalization: Teach your digital twin about your preferences, interests, and experiences to enhance the realism of the conversations.
 - AI-powered interactions: The AI assistant behind your digital twin is helpful, creative, clever, and friendly, enabling engaging and dynamic conversations.
+
+If you want to run it on your own, start from creating .env file using example file then installing all requirements by pip
