@@ -49,6 +49,7 @@ dp = Dispatcher(bot, storage=storage)
 class Twin(StatesGroup):
     Age = State()
     Info = State()
+    Prompt = State()
     Chat = State()
 
 
@@ -86,7 +87,7 @@ async def help_section(callback_query: types.CallbackQuery):
 async def create_twin(callback_query: types.CallbackQuery, state: FSMContext):
     await callback_query.answer()
     await bot.send_chat_action(callback_query.from_user.id, types.ChatActions.TYPING)
-    
+
     # Set the initial state to Twin.Age
     await Twin.Age.set()
 
@@ -105,9 +106,9 @@ async def process_age(message: types.Message, state: FSMContext):
     await state.update_data(age=age)
     await Twin.Info.set()
     await message.reply(
-        "Age saved. Please provide additional information about the twin, " 
-        "in this way:\n\nWhat was your main goal when you were at your age" 
-        "What was your hobby, education and what plans you had for a " 
+        "Age saved. Please provide additional information about the twin, "
+        "in this way:\n\nWhat was your main goal when you were at your age"
+        "What was your hobby, education and what plans you had for a "
         "week or month ahead, if you can remember."
     )
 
@@ -119,8 +120,37 @@ async def process_info(message: types.Message, state: FSMContext):
     # Store the info in the state
     await state.update_data(info=info)
 
+    await Twin.Prompt.set()
+    await message.reply("Information saved. Enjoy chat with your twin:")
+
+
+@dp.message_handler(state=Twin.Prompt)
+async def main_prompt(message: types.Message, state: FSMContext):
+    await message.answer_chat_action("typing")
+
+    # Access the stored age and info
+    data = await state.get_data()
+    age = data.get("age")
+    info = data.get("info")
+    prompt = (
+        "You are past version digital twin of a user, don't ask more info "
+        "try to act like him with only this given info "
+        "be nice help him self reflect act like this version. "
+        "The next lines are input information: "
+        f"Recreate {age} year old version of me, with info about my main "
+        f"goal, hobby, education and also with plans for future {info}"
+    )
+    answer = generate_response(prompt)
+    await state.update_data(prompt=prompt)
     await Twin.Chat.set()
-    await message.reply("Information saved. Please provide a chat for the twin:")
+    await message.answer(answer)
+
+
+@dp.message_handler(state=Twin.Chat)
+async def chat_twin(message: types.Message, state: FSMContext):
+    await message.answer_chat_action("typing")
+    answer = generate_response(message)
+    await message.answer(answer)
 
 
 # @dp.message_handler(state=Twin.Age)
@@ -130,8 +160,7 @@ async def process_info(message: types.Message, state: FSMContext):
 @dp.message_handler()
 async def my_responses(message: types.Message, state):
     await message.answer_chat_action("typing")
-    answer = generate_response(message)
-    await message.answer(answer)
+    await message.answer("Start by /start and picking an option")
 
 
 if __name__ == "__main__":
